@@ -1,6 +1,15 @@
-# DSH Refined
-
-**DeepSeek-Refined 的 DeepSeek Harness 移植版** —— 为 DeepSeek Harness（DSH）前端注入 Obsidian Border 风格的 Markdown 美化与多主题配色。
+<h1 align="center">dsh-refined</h1>
+<p align="center">
+  <img src="https://img.shields.io/github/license/djh2203/DeepSeek-Refined?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/badge/DeepSeek-5786FE?style=flat-square&logo=deepseek&logoColor=white" alt="DeepSeek" />
+  <img src="https://img.shields.io/badge/Obsidian-7C3AED?style=flat-square&logo=obsidian&logoColor=white" alt="Obsidian" />
+  <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
+</p>
+<p align="center">
+<h3 align="center">
+DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
+为 DeepSeek Harness（DSH）前端注入 Obsidian Border 风格的 Markdown 美化与多主题配色。
+</p>
 
 原版是一个 Tampermonkey 用户脚本（见 [`DeepSeek-Refined`](https://github.com/djh2203/DeepSeek-Refined)），作用于网页版 DeepSeek Chat。本仓库把它移植到 DSH，提供**两种安装形态**：
 
@@ -62,7 +71,6 @@ dsh web --port 3080               # 重启
 
 - **Settings → 插件 页面里没有它？** 正常——那是部署级插件的清单。动态粘贴版属于创建它的那个会话，只在聊天里的运行卡片可见。
 - **重启 DSH 后没效果了？** 动态粘贴版是会话级临时扩展，重启即失，请改用**方式一**部署级安装。
-- **主题颜色每个浏览器不一样？** 选择存在各浏览器 `localStorage`，每台设备可独立记住自己的主题。
 - **`dsh plugin` 报 pnpm 找不到？** 先 `npm i -g pnpm`（方式一第一步）。
 
 ## 与原版的差异
