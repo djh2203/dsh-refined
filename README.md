@@ -6,7 +6,7 @@
 
 | 形态 | 持久性 | 适用场景 |
 | --- | --- | --- |
-| **部署级插件**（`package.json` + `lib/`） | 常驻，后端重启不丢，所有会话生效 | 自己/团队的部署，推荐 |
+| **部署级插件**（bundle 包，推荐） | 常驻，后端重启不丢，所有会话生效，一条命令安装 | 自己/团队的部署 |
 | **动态插件**（`main.js` 粘贴版） | 会话级，进程重启后需重装 | 快速体验、无法改部署的场合 |
 
 不注入脚本、不改动 DSH 源码，纯前端扩展，随时可卸载恢复原样。
@@ -18,60 +18,38 @@
 | 5 套主题 | Border（默认）/ Nord / Twilight / GitHub / Atom One，深色/浅色自动跟随系统 |
 | 设计令牌覆盖 | 通过 `theme.overrideTokens()` 覆盖 DSH 的 `--dsw-alias-*` CSS 变量（与网页版同一套变量名），整站配色统一生效 |
 | Markdown 美化 | 各级标题左侧彩色圆角竖条；引用块 Border 点阵图案背景 + 品牌色圆角竖条；粗体/斜体/行内代码/KaTeX 公式独立配色 |
-| 主题切换 | 会话头部右侧调色板按钮，一键切换；部署版选择存 `localStorage`（后端重启也保持），动态版存 Host 内存（页面刷新保持） |
+| 主题切换 | 会话头部右侧调色板按钮，一键切换；选择存在浏览器 `localStorage`（后端重启也保持） |
 
 ## 安装方法
 
-### 方式一：部署级安装（持久，推荐）
-
-装进 DSH 部署组合：**所有会话自动生效，后端重启不丢**，Settings → 插件 页面可见可启停。
-
-前置条件：一个可用的 DSH profile（默认 `~/.dsh/profiles/web`，对应 `dsh --profile web ...`）。
-
-#### 用安装脚本（推荐）
+### 方式一：一条命令（推荐，部署级）
 
 ```bash
-git clone <本仓库地址> dsh-refined   # 或直接下载本目录
+npm i -g pnpm                                  # 一次性：dsh plugin 是 pnpm 转发器
+dsh plugin --profile web add github:djh2203/dsh-refined
+dsh web --port 3080                            # 重启 DSH
+```
+
+**无需改任何配置**：本包声明了 `dsh.bundle`，`dsh plugin add` 安装后会自动把 `dsh-refined` 加入 profile 的 `dsh.profile.bundles`，重启即生效。
+
+- **发布前/本地试装**：把 github 地址换成本地路径 → `dsh plugin --profile web add file:/绝对路径/dsh-refined`
+- **profile 名**：`web` 换成你自己的（`dsh --profile <名字> ...` 用的那个）
+- **验证**：Settings → 插件 出现 `dsh-refined`；任意会话头部右侧出现调色板按钮
+- **更新**：`dsh plugin --profile web update dsh-refined` → 重启
+- **卸载**：`dsh plugin --profile web remove dsh-refined` → 重启
+
+### 方式二：install.sh（没有 pnpm 的环境）
+
+```bash
+git clone <本仓库地址> dsh-refined
 cd dsh-refined
-./install.sh web                     # web 是 profile 名，可换成你自己的
+./install.sh web                  # web 换成 profile 名
+dsh web --port 3080               # 重启
 ```
 
-脚本会：把包链接进 `~/.dsh/profiles/web/node_modules/`，往 `cordis.patch.yml` 插入条目。然后**重启 DSH**：
+脚本把包链接进 `~/.dsh/profiles/web/node_modules/`，并在 `cordis.patch.yml` 追加条目（幂等，可重复执行）。卸载：删除条目与链接后重启。
 
-```bash
-dsh web --port 3080        # 按你平时的启动方式即可
-```
-
-#### 手动步骤（不用脚本）
-
-```bash
-# 1) 把包放进 profile 的 node_modules（loader 从 profile 目录解析）
-ln -s <本目录> ~/.dsh/profiles/web/node_modules/dsh-refined
-
-# 2) 编辑 ~/.dsh/profiles/web/cordis.patch.yml，追加：
-- insert:
-    - id: dsh-refined
-      name: dsh-refined
-      config: {}
-
-# 3) 重启 dsh web
-```
-
-#### 验证
-
-1. Settings → 插件 出现 `dsh-refined` 条目（可启停）
-2. 任意会话头部右侧出现调色板按钮，默认 Border 主题生效
-3. 重启后端后主题仍保持（存在浏览器 localStorage）
-
-#### 卸载 / 更新
-
-- **卸载**：从 `cordis.patch.yml` 删除条目 → 删除 `node_modules/dsh-refined` 链接 → 重启
-- **更新**：`git pull`（或重新复制 `lib/`）→ 重启
-- 注意链接指向克隆目录：移动/删除克隆目录会使链接失效
-
-### 方式二：动态粘贴安装（临时，快速体验）
-
-不需要拆代码段，也不需要改任何配置：
+### 方式三：动态粘贴（临时体验）
 
 1. 打开 [`main.js`](./main.js)，全选复制全文（GitHub 仓库页点 **Raw** 再复制更干净）
 2. 打开你的 DSH Web，**新建一个会话**
@@ -84,13 +62,14 @@ ln -s <本目录> ~/.dsh/profiles/web/node_modules/dsh-refined
 
 - **Settings → 插件 页面里没有它？** 正常——那是部署级插件的清单。动态粘贴版属于创建它的那个会话，只在聊天里的运行卡片可见。
 - **重启 DSH 后没效果了？** 动态粘贴版是会话级临时扩展，重启即失，请改用**方式一**部署级安装。
-- **主题颜色每个浏览器不一样？** 部署版把选择存在各浏览器 `localStorage`，所以每台设备可独立记住自己的主题。
+- **主题颜色每个浏览器不一样？** 选择存在各浏览器 `localStorage`，每台设备可独立记住自己的主题。
+- **`dsh plugin` 报 pnpm 找不到？** 先 `npm i -g pnpm`（方式一第一步）。
 
 ## 与原版的差异
 
 - **选择器适配**：DSH 的 Markdown 容器是 CSS Modules 哈希类名（如 `_markdown_1nba0_5`），使用 `[class*="_markdown_"]` 前缀匹配，避免依赖具体哈希值
 - **深色模式钩子相同**：DSH 与网页版一样使用 `body[data-ds-dark-theme]`
-- **持久化**：原版用 `localStorage`；部署版同样用 `localStorage`（后端重启保持），动态粘贴版用 Host 内存（页面刷新保持、后端重启回默认）
+- **持久化**：原版用 `localStorage`；部署版同样用 `localStorage`（后端重启保持）
 - **未移植**：行内代码点击复制、消息宽度 75% 与表格宽度 70%（DSH 布局为固定列宽 + 表格自适应滚动，强行收窄会破坏版面）
 
 ## 自定义

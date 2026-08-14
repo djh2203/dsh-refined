@@ -1,0 +1,7 @@
+# dsh-refined bundle 层：以一次 insert 把本包声明为 loader 插件条目。
+# 本文件是 bundle patch（见 package.json 的 dsh.bundle.patch），
+# 由 dsh 在组合时按 dsh.profile.bundles 顺序叠加到根条目列表。
+- insert:
+    - id: dsh-refined
+      name: dsh-refined
+      config: {}
