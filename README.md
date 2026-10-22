@@ -27,6 +27,7 @@ DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
 | 5 套主题 | Border（默认）/ Nord / Twilight / GitHub / Atom One，深色/浅色自动跟随系统 |
 | 设计令牌覆盖 | 通过 `theme.overrideTokens()` 覆盖 DSH 的 `--dsw-alias-*` CSS 变量（与网页版同一套变量名），整站配色统一生效 |
 | Markdown 美化 | 各级标题左侧彩色圆角竖条；引用块 Border 点阵图案背景 + 品牌色圆角竖条；粗体/斜体/行内代码/KaTeX 公式独立配色 |
+| 行内代码点击复制 | 点一下聊天正文里的行内代码即复制其内容，顶部弹出「已复制：…」提示条；代码块、工具输出块、链接与引用芯片不拦截 |
 | 主题切换 | 会话头部右侧调色板按钮，一键切换；选择存在浏览器 `localStorage`（后端重启也保持） |
 
 ## 安装方法
@@ -84,7 +85,8 @@ dsh web --port 3080               # 重启
 - **选择器适配**：DSH 的 Markdown 容器是 CSS Modules 哈希类名（如 `_markdown_1nba0_5`），使用 `[class*="_markdown_"]` 前缀匹配，避免依赖具体哈希值
 - **深色模式钩子相同**：DSH 与网页版一样使用 `body[data-ds-dark-theme]`
 - **持久化**：原版用 `localStorage`；部署版同样用 `localStorage`（后端重启保持）
-- **未移植**：行内代码点击复制、消息宽度 75% 与表格宽度 70%（DSH 布局为固定列宽 + 表格自适应滚动，强行收窄会破坏版面）
+- **行内代码点击复制**：原版挂在 `document` 上做事件委托；部署版同样是 `document` 捕获阶段委托，但多两层过滤——只在 `[class*="_markdown_"]` 容器内、排除 `pre` / `.md-code-block` / 工具输出块（`[data-read]`、`[data-diff]`、`[data-search]`、`[data-terminal]`）、并且点在链接/按钮上时不拦截；有文字选区时让位给原生选择。**动态粘贴版不支持**（沙箱不提供 `document`）
+- **未移植**：消息宽度 75% 与表格宽度 70%（DSH 布局为固定列宽 + 表格自适应滚动，强行收窄会破坏版面）
 
 ## 自定义
 
