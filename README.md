@@ -70,8 +70,14 @@ dsh web --port 3080               # 重启
 ## 常见疑问
 
 - **Settings → 插件 页面里没有它？** 正常——那是部署级插件的清单。动态粘贴版属于创建它的那个会话，只在聊天里的运行卡片可见。
+- **装上了，但没生效 / 有时有效有时无效？** 这是 1.0.0 的一个启动竞态：插件原先用 `ctx.get('theme')` 自己探测服务，外壳的 `theme` / `slots` 服务还没就绪时 apply 直接静默返回，于是主题不生效、按钮也不出现。现在插件对象声明了 `inject: ['theme', 'slots']`，由 cordis 等两个服务就位后再激活（同时 `dsh.client.immediately` 让客户端包在启动阶段就预取）。升级：`dsh plugin --profile web update dsh-refined` 后重启。判断是否生效：浏览器控制台会有 `[dsh-refined] 已启用：主题 …`。
 - **重启 DSH 后没效果了？** 动态粘贴版是会话级临时扩展，重启即失，请改用**方式一**部署级安装。
 - **`dsh plugin` 报 pnpm 找不到？** 先 `npm i -g pnpm`（方式一第一步）。
+
+## 开发注意
+
+- 客户端插件对象必须显式声明 `inject: ['theme', 'slots']`。不要用 `ctx.get('theme')` 自己探测后就 `return`——那就是上面那个“时灵时不灵”bug 的成因。
+- 改完 `lib/client.js` 后要重装（`dsh plugin --profile web update dsh-refined`）或重启 DSH；浏览器端 bundle 是按 mtime 快照分发的，直接改文件不会自动重载。
 
 ## 与原版的差异
 

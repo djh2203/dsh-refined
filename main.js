@@ -61,6 +61,8 @@ return {
  * CLIENT 段 —— 填入动态插件的 code.client
  * ==========================================================================*/
 return {
+  // 声明服务依赖：运行时等到 theme / slots 就绪才 apply（否则会静默不生效）
+  inject: ['theme', 'slots'],
   async apply(ctx) {
     // ============ 主题调色板（移植自 DeepSeek-Refined） ============
     const THEMES = {
@@ -363,9 +365,11 @@ return {
     }
 
     // ============ 激活 ============
-    const theme = ctx.get('theme')
-    if (theme === undefined) return
-    const slots = ctx.get('slots')
+    // theme / slots 由外壳提供，必须声明在返回的插件对象上（inject），
+    // 让运行时等到服务就绪再调用 apply；用 ctx.get() 自己探测会在服务
+    // 还没就绪时静默退出，表现为“装了但时灵时不灵”。
+    const theme = ctx.theme
+    const slots = ctx.slots
 
     let tokenDisposer = null
     let cssDisposer = null
@@ -391,7 +395,7 @@ return {
     } catch (e) { /* Host 不可用时使用默认主题 */ }
     applyTheme(initial)
 
-    if (slots === undefined) return
+    if (!slots) return
     slots.inject('conversation.session.header.utilities', () => slots.register(
       { name: 'conversation.session.header.utilities', id: 'dsh-refined-picker', order: 100 },
       (props) => React.createElement(ThemePicker, {
