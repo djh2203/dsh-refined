@@ -1,6 +1,6 @@
 <h1 align="center">dsh-refined</h1>
 <p align="center">
-  <img src="https://img.shields.io/github/license/djh2203/DeepSeek-Refined?style=flat-square" alt="license" />
+  <img src="https://img.shields.io/github/license/djh2203/dsh-refined?style=flat-square" alt="license" />
   <img src="https://img.shields.io/badge/DeepSeek-5786FE?style=flat-square&logo=deepseek&logoColor=white" alt="DeepSeek" />
   <img src="https://img.shields.io/badge/Obsidian-7C3AED?style=flat-square&logo=obsidian&logoColor=white" alt="Obsidian" />
   <img src="https://img.shields.io/badge/JavaScript-F7DF1E?style=flat-square&logo=javascript&logoColor=black" alt="JavaScript" />
@@ -30,6 +30,28 @@ DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
 | 行内代码点击复制 | 点一下聊天正文里的行内代码即复制其内容，顶部弹出「已复制：…」提示条；代码块、工具输出块、链接与引用芯片不拦截 |
 | 与壁纸类插件共存 | 文字色固定归本插件（`!important` 样式表），底色/描边/品牌色在检测到别的插件画背景时自动让位，壁纸与玻璃效果不被顶掉；菜单里可手动接管 |
 | 主题切换 | 会话头部右侧调色板按钮，一键切换；选择存在浏览器 `localStorage`（后端重启也保持） |
+
+## 前置条件
+
+- DSH（DeepSeek Harness）Web 端；本版本在 `0.2.0-rc.2` 上实测通过。
+- 安装走 `dsh plugin` 时需要 `pnpm`（`npm i -g pnpm`，一次性）；没有 pnpm 就用下面的 `install.sh`。
+- 不需要任何构建步骤：仓库里的 `lib/*.js` 就是最终产物。
+
+## 它动了什么，不做什么
+
+给别人装的东西，先把边界说清楚：
+
+**会做的**
+
+- 往页面注入**一张 `<style>`**（Markdown 美化 + 文字色 `!important`）和一个**会话头部按钮**；卸载时全部移除，界面恢复原样。
+- 通过 DSH 公开的 `theme.overrideTokens()` 覆盖 `--dsw-alias-*` 设计令牌；不改动 DSH 源码，不替换应用根节点。
+- 只在浏览器 `localStorage` 里写三个键：`dsr_theme`（主题）、`dsr_surface`（背景归属）、`dsr_foreground`（文字归属）。
+
+**不会做的**
+
+- 不联网：没有任何网络请求、不上报遥测。
+- 不碰你的文件、终端、会话内容和凭据；Host 侧（`lib/index.js`）是空实现，不注册任何 tool / prompt / 命令。
+- 不读取别的插件的 DOM 或样式内容去“猜”布局——背景归属判定只读 `document.styleSheets` 里 `--dsw-alias-bg-base` 这一个令牌名。
 
 ## 安装方法
 
@@ -94,7 +116,7 @@ dsh web --port 3080               # 重启
 ## 常见疑问
 
 - **Settings → 插件 页面里没有它？** 正常——那是部署级插件的清单。动态粘贴版属于创建它的那个会话，只在聊天里的运行卡片可见。
-- **装上了，但没生效 / 有时有效有时无效？** 这是 1.0.0 的一个启动竞态：插件原先用 `ctx.get('theme')` 自己探测服务，外壳的 `theme` / `slots` 服务还没就绪时 apply 直接静默返回，于是主题不生效、按钮也不出现。现在插件对象声明了 `inject: ['theme', 'slots']`，由 cordis 等两个服务就位后再激活（同时 `dsh.client.immediately` 让客户端包在启动阶段就预取）。升级：`dsh plugin --profile web update dsh-refined` 后重启。判断是否生效：浏览器控制台会有 `[dsh-refined] 已启用：主题 …`。
+- **装上了，但没生效 / 有时有效有时无效？** 这是 1.0.0 的一个启动竞态：插件原先用 `ctx.get('theme')` 自己探测服务，外壳的 `theme` / `slots` 服务还没就绪时 apply 直接静默返回，于是主题不生效、按钮也不出现。现在插件对象声明了 `inject: ['theme', 'slots']`，由 cordis 等两个服务就位后再激活，不再赌加载顺序。升级：`dsh plugin --profile web update dsh-refined` 后重启。判断是否生效：浏览器控制台会有 `[dsh-refined] 已启用：主题 …`。
 - **重启 DSH 后没效果了？** 动态粘贴版是会话级临时扩展，重启即失，请改用**方式一**部署级安装。
 - **`dsh plugin` 报 pnpm 找不到？** 先 `npm i -g pnpm`（方式一第一步）。
 
