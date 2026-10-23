@@ -28,6 +28,7 @@ DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
 | 设计令牌覆盖 | 通过 `theme.overrideTokens()` 覆盖 DSH 的 `--dsw-alias-*` CSS 变量（与网页版同一套变量名），整站配色统一生效 |
 | Markdown 美化 | 各级标题左侧彩色圆角竖条；引用块 Border 点阵图案背景 + 品牌色圆角竖条；粗体/斜体/行内代码/KaTeX 公式独立配色 |
 | 行内代码点击复制 | 点一下聊天正文里的行内代码即复制其内容，顶部弹出「已复制：…」提示条；代码块、工具输出块、链接与引用芯片不拦截 |
+| 与壁纸类插件共存 | 文字色固定归本插件（`!important` 样式表），底色/描边/品牌色在检测到别的插件画背景时自动让位，壁纸与玻璃效果不被顶掉；菜单里可手动接管 |
 | 主题切换 | 会话头部右侧调色板按钮，一键切换；选择存在浏览器 `localStorage`（后端重启也保持） |
 
 ## 安装方法
@@ -67,6 +68,28 @@ dsh web --port 3080               # 重启
    > 请把上面的内容创建为动态 Cordis 插件并运行：HOST 段 → `code.host`，CLIENT 段 → `code.client`
 4. 助手定义并运行插件后，聊天里会出现**运行卡片**，点「**允许**」授权
 5. 主题立即生效：会话头部右侧出现调色板按钮，可切换 5 套主题
+
+## 和其它插件共存（壁纸 / 玻璃类）
+
+壁纸类插件（如 `dsh-plugin-wallpaper-engine`）靠两件事抢戏：往 body 上声明 `--dsw-alias-bg-*` 画玻璃/透明底，以及用 `theme.overrideTokens` 改文字色。本插件把令牌拆成两组，各走一条赛道，互不打架：
+
+| 组 | 令牌 | 归属 | 实现方式 |
+| --- | --- | --- | --- |
+| **前景（文字）** | `--dsw-alias-label-primary/secondary/tertiary/caption` | 固定归本插件 | 写在自己的 `<style>` 里带 `!important`。作者样式表的 `!important` 优先于 ui-layout presenter 写在 body 上的**行内普通声明**，所以别的插件后注册令牌层也顶不掉文字色 |
+| **表面（底色/描边/品牌/代码块）** | `--dsw-alias-bg-*`、`--dsw-alias-border-*`、`--dsw-alias-brand-primary`、`--dsw-alias-markdown-code-block*`、`--dsw-specific-*` | 可以让位 | 走 `theme.overrideTokens` 令牌层；一旦发现别的插件在画背景，整层撤掉，别人的背景才看得见 |
+
+自动判定：扫描 `document.styleSheets`，只看带 `data-plugin` 标记的 `<style>`，跳过 `@deepseek-ai/*`（内核自带）和本插件自己；表里**重声明了 `--dsw-alias-bg-base`**（页面基色）就算「别人在画背景」——壁纸 / 玻璃类插件都会把它改成 `transparent` 或玻璃色。复检时机：apply 时、apply 后 1.5s、每次 `theme/change`、每次打开调色板菜单。结论没变时不会反复重注册令牌层。
+
+调色板菜单里可以手动接管这两个判定（都存在 `localStorage`）：
+
+- **`背景：自动 / 我的 / 让出`**（`dsr_surface`）：点一次切一档。`自动` = 上面那条检测；`我的` = 无视检测自己画；`让出` = 强制不写表面令牌。
+- **`文字：跟随其它插件`**（`dsr_foreground`）：默认关闭（用本插件的文字色）。壁纸太花导致文字看不清时可打开，把文字色交还给壁纸插件。
+
+已知局限：
+
+- 只认**带 `data-plugin` 标记**的第三方样式表。无标注的 `<style>` 检测不到，手动切「背景：让出」即可。
+- 如果对方把背景写在 `theme.overrideTokens` 层里而不是样式表里，本插件切换主题时重新注册表面层会盖住它 —— 同样用「背景：让出」解决。
+- 动态粘贴版（`main.js`）没有 `document`，无法检测，也没有这两个开关：它固定自己画背景、固定用自己的文字色。
 
 ## 常见疑问
 
