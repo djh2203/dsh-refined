@@ -113,6 +113,16 @@ dsh web --port 3080               # 重启
 - 如果对方把背景写在 `theme.overrideTokens` 层里而不是样式表里，本插件切换主题时重新注册表面层会盖住它 —— 同样用「背景：让出」解决。
 - 动态粘贴版（`main.js`）没有 `document`，无法检测，也没有这两个开关：它固定自己画背景、固定用自己的文字色。
 
+## 更新不到新版？（git 装法的坑）
+
+`dsh plugin add github:...` 之后，profile 的 `pnpm-lock.yaml` 会把 `dsh-refined` **钉死在当时解析到的那个 commit** 上（形如 `version: git+https://…/dsh-refined.git#<commit>`）。仓库之后再有提交，`dsh plugin --profile web update dsh-refined` 仍可能装回旧 commit —— 表现就是"更新完行为没变"。
+
+任选一种强制重新解析：
+
+- 重新 add 一次：`dsh plugin --profile web add github:djh2203/dsh-refined`（会重新解析分支）
+- 或者直接装本地目录，改完代码即时生效：`dsh plugin --profile web add file:/绝对路径/dsh-refined`
+- 验证装到哪一版：`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/dsh-refined/package.json').version)"`
+
 ## 常见疑问
 
 - **Settings → 插件 页面里没有它？** 正常——那是部署级插件的清单。动态粘贴版属于创建它的那个会话，只在聊天里的运行卡片可见。
@@ -121,6 +131,9 @@ dsh web --port 3080               # 重启
 - **`dsh plugin` 报 pnpm 找不到？** 先 `npm i -g pnpm`（方式一第一步）。
 
 ## 开发注意
+
+- 自测：`node test/smoke.js`（不用浏览器，stub 掉 `window`/`document`/`theme` 真跑 `apply`）。
+- **自己注入的 `<style>` 不要打 `data-plugin="<本包名>"`**。`dsh-client-modules` 会把工厂产出的样式算成自己的：materialize 后认领所有无标记的 `<style>`，模块重载时再 `style[data-plugin="<包名>"] → remove()`。结果就是插件还活着、令牌还在，但整张样式表凭空消失（美化 / 光标 / 文字色 `!important` 全没）。本插件用 `data-plugin="dsh-refined-theme"` 绕开，并在 `theme/change` 与 5 秒轮询里补回被删的标签。
 
 - 客户端插件对象必须显式声明 `inject: ['theme', 'slots']`。不要用 `ctx.get('theme')` 自己探测后就 `return`——那就是上面那个“时灵时不灵”bug 的成因。
 - 改完 `lib/client.js` 后要重装（`dsh plugin --profile web update dsh-refined`）或重启 DSH；浏览器端 bundle 是按 mtime 快照分发的，直接改文件不会自动重载。
