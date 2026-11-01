@@ -1,6 +1,6 @@
 {
   "name": "dsh-refined",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "DeepSeek-Refined 移植：为 DeepSeek Harness 前端注入 5 套 Obsidian Border 风格主题与 Markdown 美化（部署级 Cordis 客户端插件）",
   "author": "djh2203",
   "license": "MIT",
@@ -23,6 +23,14 @@
   ],
   "type": "commonjs",
   "main": "./lib/index.js",
+  "files": [
+    "lib/",
+    "cordis.patch.yml",
+    "install.sh",
+    "main.js",
+    "README.md",
+    "LICENSE"
+  ],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"

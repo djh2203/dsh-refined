@@ -61,6 +61,7 @@ return {
  * CLIENT 段 —— 填入动态插件的 code.client
  * ==========================================================================*/
 return {
+  name: 'dsh-refined',            // 仅用于诊断显示
   // 声明服务依赖：运行时等到 theme / slots 就绪才 apply（否则会静默不生效）
   inject: ['theme', 'slots'],
   async apply(ctx) {

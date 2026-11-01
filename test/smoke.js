@@ -27,6 +27,7 @@ function makeEl(tag) {
     appendChild(c) { c.parentNode = this; this.children.push(c); return c },
     removeChild(c) { this.children = this.children.filter((x) => x !== c); c.parentNode = null; return c },
     querySelector(sel) { this._q = this._q || {}; return (this._q[sel] = this._q[sel] || { textContent: '' }) },
+    classList: { toggle() {}, add() {}, remove() {} },
     querySelectorAll() { return [] },
     addEventListener() {},
   }
@@ -61,6 +62,14 @@ function chain(specs) {
   const nodes = specs.map((s) => ({
     tagName: s.tag.toUpperCase(), attrs: s.attrs || {}, textContent: s.text || '', parent: null,
     getAttribute(k) { return Object.prototype.hasOwnProperty.call(this.attrs, k) ? this.attrs[k] : null },
+    contains(other) {
+      let cur = other
+      while (cur) {
+        if (cur === this) return true
+        cur = cur.parent
+      }
+      return false
+    },
     closest(sel) {
       const parts = sel.split(',').map((x) => x.trim())
       let cur = this
@@ -75,12 +84,15 @@ function chain(specs) {
   return nodes[0]
 }
 
-function build(foreignBackground) {
+function build(foreignBackground, options) {
+  const opts = options || {}
   const copied = []
   const overrides = []
   const listeners = {}
   const captured = {}
   const clickHandlers = []
+  const docListeners = { click: [], keydown: [] }
+  const effects = []
   const head = makeEl('head')
   const body = makeEl('body')
   const extraSheets = []
@@ -90,9 +102,14 @@ function build(foreignBackground) {
     createElement: (t) => makeEl(t),
     querySelectorAll: () => [],
     querySelector: () => null,
-    addEventListener(name, fn) { if (name === 'click') clickHandlers.push(fn) },
-    removeEventListener() {},
-    execCommand: () => true,
+    addEventListener(name, fn) {
+      if (name === 'click') clickHandlers.push(fn)
+      if (docListeners[name]) docListeners[name].push(fn)
+    },
+    removeEventListener(name, fn) {
+      if (docListeners[name]) docListeners[name] = docListeners[name].filter((x) => x !== fn)
+    },
+    execCommand: () => (opts.execOk === undefined ? true : opts.execOk),
     get styleSheets() {
       const own = head.children.filter((el) => el.tagName === 'STYLE').map((el) => ({ ownerNode: el, cssRules: [] }))
       return own.concat(extraSheets)
@@ -118,12 +135,15 @@ function build(foreignBackground) {
     getTheme: () => ({ active: { colorScheme: 'light', tokens: {} } }),
   }
   const slots = {
-    inject: (key, cb) => cb(),
+    inject: (key, cb) => {
+      if (opts.noSlot) throw new Error('slot unavailable (test)')
+      return cb()
+    },
     register: (opts, comp) => { if (typeof comp === 'function') comp(); return () => {} },
   }
   const ctx = {
     theme, slots,
-    effect(fn) { fn() },
+    effect(fn) { effects.push(fn()) },
     on(name, fn) { listeners[name] = fn; return () => {} },
   }
   const React = {
@@ -141,8 +161,16 @@ function build(foreignBackground) {
     localStorage: { getItem: () => null, setItem: () => {} },
     setTimeout: () => 0, clearTimeout: () => {},
     setInterval: () => 0, clearInterval: () => {},
-    navigator: { clipboard: { writeText: (t) => { copied.push(t); return Promise.resolve() } } },
-    getSelection: () => null,
+    navigator: {
+      clipboard: {
+        writeText: (t) => {
+          if (opts.clipboardSyncThrow) throw new Error('blocked by policy (test)')
+          copied.push(t)
+          return Promise.resolve()
+        },
+      },
+    },
+    getSelection: () => (opts.selection ? opts.selection() : null),
   }
   let factory = null
   window.__ModuleLoader__ = { load: (r) => { factory = r.factory } }
@@ -160,13 +188,15 @@ function build(foreignBackground) {
   mod.apply(ctx)
 
   return {
-    copied, overrides, listeners, captured, head,
+    copied, overrides, listeners, captured, head, docListeners,
+    disposeAll: () => effects.forEach((fn) => { if (typeof fn === 'function') fn() }),
     click: clickHandlers[0],
     addForeignSheet,
     styleNode: () => head.children.find((el) => /^dsh-refined/.test(el.getAttribute('data-plugin') || '')),
   }
 }
 
+(async () => {
 // ---- 1. 没有第三方背景插件：表面层归自己，文字走 !important ----
 const a = build(false)
 const regs = a.overrides.filter((o) => o.kind === 'reg')
@@ -244,5 +274,73 @@ const editable = chain([
 e.click({ target: editable, preventDefault() { prevented++ } })
 assert(prevented === 1 && e.copied.length === 1, '可编辑祖先下的 code 不接管')
 
+// ---- 6. 浮动按钮兜底：注册失败时可用，且卸载后不留 document 监听 ----
+const f = build(false, { noSlot: true })
+assert(f.docListeners.keydown.length === 1, '浮动兜底挂了 1 个 keydown 监听（Esc 关闭菜单）')
+assert(f.styleNode() === undefined || f.styleNode().getAttribute('data-plugin') === 'dsh-refined-theme',
+  '浮动兜底的样式标签也带本项目标记（不会被模块系统回收）')
+f.disposeAll()
+assert(f.docListeners.keydown.length === 0 && f.docListeners.click.length === 0,
+  '卸载后 document 级监听全部摘掉（重复 apply 不会越挂越多）')
+
+// ---- 7. 页面别处残留选区，不应妨碍复制（只有选区压住该 code 才让位） ----
+const elsewhereSelection = {
+  isCollapsed: false,
+  rangeCount: 1,
+  toString: () => '别的消息里的文字',
+  getRangeAt: () => ({
+    commonAncestorContainer: chain([{ tag: 'span', text: 'x' }, { tag: 'div' }]),
+    intersectsNode: () => false,
+  }),
+}
+const g = build(false, { selection: () => elsewhereSelection })
+let preventedG = 0
+const inlineG = chain([
+  { tag: 'code', text: 'array.filter' },
+  { tag: 'div', attrs: { class: '_markdown_1ypvv_5' } },
+])
+g.click({ target: inlineG, preventDefault() { preventedG++ } })
+assert(preventedG === 1 && g.copied[0] === 'array.filter', '别处有残留选区时仍然复制')
+
+const coveringSelection = {
+  isCollapsed: false,
+  rangeCount: 1,
+  getRangeAt: () => ({
+    commonAncestorContainer: chain([{ tag: 'span', text: 'x' }, { tag: 'div' }]),
+    intersectsNode: () => true,
+  }),
+}
+const h = build(false, { selection: () => coveringSelection })
+let preventedH = 0
+const inlineH = chain([
+  { tag: 'code', text: 'array.map' },
+  { tag: 'div', attrs: { class: '_markdown_1ypvv_5' } },
+])
+h.click({ target: inlineH, preventDefault() { preventedH++ } })
+assert(preventedH === 0 && h.copied.length === 0, '选区压在该 code 上时让位给原生选择')
+
+// ---- 8. ⌘/Ctrl/Alt + 点击不抢 ----
+const k = build(false)
+let preventedK = 0
+k.click({ target: inlineH, metaKey: true, preventDefault() { preventedK++ } })
+assert(preventedK === 0 && k.copied.length === 0, '⌘+点击不接管')
+k.click({ target: inlineH, ctrlKey: true, preventDefault() { preventedK++ } })
+assert(preventedK === 0 && k.copied.length === 0, 'Ctrl+点击不接管')
+
+// ---- 9. 剪贴板 API 同步抛错 → 走 execCommand 退路 ----
+const m = build(false, { clipboardSyncThrow: true })
+let preventedM = 0
+const inlineM = chain([
+  { tag: 'code', text: 'npm i' },
+  { tag: 'div', attrs: { class: '_markdown_1ypvv_5' } },
+])
+m.click({ target: inlineM, preventDefault() { preventedM++ } })
+assert(preventedM === 1, '剪贴板 API 抛错时仍然接管点击（走退路）')
+
+const m2 = build(false, { clipboardSyncThrow: true, execOk: false })
+m2.click({ target: inlineM, preventDefault() {} })
+await new Promise((r) => setTimeout(r, 0))
+
 console.log(fail ? '\n有 ' + fail + ' 项失败' : '\n全部通过')
 process.exitCode = fail ? 1 : 0
+})()

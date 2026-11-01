@@ -16,7 +16,9 @@ DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
 | 形态 | 持久性 | 适用场景 |
 | --- | --- | --- |
 | **部署级插件**（bundle 包，推荐） | 常驻，后端重启不丢，所有会话生效，一条命令安装 | 自己/团队的部署 |
-| **动态插件**（`main.js` 粘贴版） | 会话级，进程重启后需重装 | 快速体验、无法改部署的场合 |
+| **动态插件**（`main.js` 粘贴版，实验版） | 会话级，进程重启后需重装；主题选择存在 Host 进程内存里（重启即丢，且同一 Host 的各浏览器共享） | 快速体验、无法改部署的场合 |
+
+> 动态粘贴版是**功能子集**：只有 5 套主题、Markdown 美化和头部调色板按钮。行内代码点击复制与手型光标、和壁纸类插件的背景让位、菜单里的共存开关，都只有部署版有。要完整体验请用部署级安装。
 
 不注入脚本、不改动 DSH 源码，纯前端扩展，随时可卸载恢复原样。
 
@@ -27,8 +29,8 @@ DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
 | 5 套主题 | Border（默认）/ Nord / Twilight / GitHub / Atom One，深色/浅色自动跟随系统 |
 | 设计令牌覆盖 | 通过 `theme.overrideTokens()` 覆盖 DSH 的 `--dsw-alias-*` CSS 变量（与网页版同一套变量名），整站配色统一生效 |
 | Markdown 美化 | 各级标题左侧彩色圆角竖条；引用块 Border 点阵图案背景 + 品牌色圆角竖条；粗体/斜体/行内代码/KaTeX 公式独立配色 |
-| 行内代码点击复制 | 点一下聊天正文里的行内代码即复制其内容，顶部弹出「已复制：…」提示条；代码块、工具输出块、链接与引用芯片不拦截 |
-| 与壁纸类插件共存 | 文字色固定归本插件（`!important` 样式表），底色/描边/品牌色在检测到别的插件画背景时自动让位，壁纸与玻璃效果不被顶掉；菜单里可手动接管 |
+| 行内代码点击复制（仅部署版） | 点一下聊天正文里的行内代码即复制其内容，顶部弹出「已复制：…」提示条；代码块、工具输出块、链接与引用芯片不拦截，⌘/Ctrl/Alt+点击不抢，选区压在代码上时让位给原生选择 |
+| 与壁纸类插件共存（仅部署版） | 文字色固定归本插件（`!important` 样式表），底色/描边/品牌色在检测到别的插件画背景时自动让位，壁纸与玻璃效果不被顶掉；菜单里可手动接管 |
 | 主题切换 | 会话头部右侧调色板按钮，一键切换；选择存在浏览器 `localStorage`（后端重启也保持） |
 
 ## 前置条件
@@ -43,7 +45,7 @@ DeepSeek-Refined 的 DeepSeek Harness 移植版</h3>
 
 **会做的**
 
-- 往页面注入**一张 `<style>`**（Markdown 美化 + 文字色 `!important`）和一个**会话头部按钮**；卸载时全部移除，界面恢复原样。
+- 往页面注入**样式**（Markdown 美化 + 文字色 `!important`，正常情况一张 `<style>`；若头部槽位注册失败改用浮动按钮，会多一张）和一个**会话头部按钮**；卸载时全部移除，界面恢复原样。
 - 通过 DSH 公开的 `theme.overrideTokens()` 覆盖 `--dsw-alias-*` 设计令牌；不改动 DSH 源码，不替换应用根节点。
 - 只在浏览器 `localStorage` 里写三个键：`dsr_theme`（主题）、`dsr_surface`（背景归属）、`dsr_foreground`（文字归属）。
 
@@ -82,6 +84,8 @@ dsh web --port 3080               # 重启
 
 脚本把包链接进 `~/.dsh/profiles/web/node_modules/`，并在 `cordis.patch.yml` 追加条目（幂等，可重复执行）。卸载：删除条目与链接后重启。
 
+与方式一**二选一**：脚本会检测 profile 的 `package.json` 里是否已有 `dsh-refined` 依赖，已有就报错退出，避免同一个包被挂两次。macOS 上也安全（不会用 BSD `sed -i`）。
+
 ### 方式三：动态粘贴（临时体验）
 
 1. 打开 [`main.js`](./main.js)，全选复制全文（GitHub 仓库页点 **Raw** 再复制更干净）
@@ -111,17 +115,18 @@ dsh web --port 3080               # 重启
 
 - 只认**带 `data-plugin` 标记**的第三方样式表。无标注的 `<style>` 检测不到，手动切「背景：让出」即可。
 - 如果对方把背景写在 `theme.overrideTokens` 层里而不是样式表里，本插件切换主题时重新注册表面层会盖住它 —— 同样用「背景：让出」解决。
-- 动态粘贴版（`main.js`）没有 `document`，无法检测，也没有这两个开关：它固定自己画背景、固定用自己的文字色。
+- 动态粘贴版（`main.js`）**暂未实现**这套检测（沙箱里 `document` 可达，只是没做）：它固定自己画背景、固定用自己的文字色，也就没有这两个开关。
 
 ## 更新不到新版？（git 装法的坑）
 
 `dsh plugin add github:...` 之后，profile 的 `pnpm-lock.yaml` 会把 `dsh-refined` **钉死在当时解析到的那个 commit** 上（形如 `version: git+https://…/dsh-refined.git#<commit>`）。仓库之后再有提交，`dsh plugin --profile web update dsh-refined` 仍可能装回旧 commit —— 表现就是"更新完行为没变"。
 
-任选一种强制重新解析：
+按可靠程度排序：
 
-- 重新 add 一次：`dsh plugin --profile web add github:djh2203/dsh-refined`（会重新解析分支）
-- 或者直接装本地目录，改完代码即时生效：`dsh plugin --profile web add file:/绝对路径/dsh-refined`
-- 验证装到哪一版：`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/dsh-refined/package.json').version)"`
+1. **直接装本地目录**（最可靠，改代码即时生效）：`dsh plugin --profile web add file:/绝对路径/dsh-refined`
+2. **先删 lockfile 里那两条解析记录再重装**：`pnpm-lock.yaml` 里搜 `dsh-refined@git+…`，把 `importers` 段的 `version:` 行和 `packages:`/`snapshots:` 里对应的两个块删掉，然后 `dsh plugin --profile web update dsh-refined`（或 `pnpm install`）——pnpm 会重新解析分支
+3. 先试「重新 add 一次」：`dsh plugin --profile web add github:djh2203/dsh-refined`（**对同一 specifier，pnpm 常常直接复用 lockfile 的解析，所以不保证生效**）
+4. 改完务必验证：`node -e "console.log(require(process.env.HOME+'/.dsh/profiles/web/node_modules/dsh-refined/package.json').version)"`
 
 ## 常见疑问
 
@@ -132,7 +137,8 @@ dsh web --port 3080               # 重启
 
 ## 开发注意
 
-- 自测：`node test/smoke.js`（不用浏览器，stub 掉 `window`/`document`/`theme` 真跑 `apply`）。
+- 自测：`node test/smoke.js`（不用浏览器，stub 掉 `window`/`document`/`theme` 真跑 `apply`）；`node test/parity.js` 检查 `main.js` 与 `lib/client.js` 的调色板是否还一致。
+- 点选判定别用「全局有没有选区」：页面别处残留一个选区就会让行内代码永远点不动（`selectionCovers()` 只在选区压住该 `code` 时才让位）。
 - **自己注入的 `<style>` 不要打 `data-plugin="<本包名>"`**。`dsh-client-modules` 会把工厂产出的样式算成自己的：materialize 后认领所有无标记的 `<style>`，模块重载时再 `style[data-plugin="<包名>"] → remove()`。结果就是插件还活着、令牌还在，但整张样式表凭空消失（美化 / 光标 / 文字色 `!important` 全没）。本插件用 `data-plugin="dsh-refined-theme"` 绕开，并在 `theme/change` 与 5 秒轮询里补回被删的标签。
 
 - 客户端插件对象必须显式声明 `inject: ['theme', 'slots']`。不要用 `ctx.get('theme')` 自己探测后就 `return`——那就是上面那个“时灵时不灵”bug 的成因。
@@ -143,7 +149,7 @@ dsh web --port 3080               # 重启
 - **选择器适配**：DSH 的 Markdown 容器是 CSS Modules 哈希类名（如 `_markdown_1nba0_5`），使用 `[class*="_markdown_"]` 前缀匹配，避免依赖具体哈希值
 - **深色模式钩子相同**：DSH 与网页版一样使用 `body[data-ds-dark-theme]`
 - **持久化**：原版用 `localStorage`；部署版同样用 `localStorage`（后端重启保持）
-- **行内代码点击复制**：原版挂在 `document` 上做事件委托；部署版同样是 `document` 捕获阶段委托，但多两层过滤——只在 `[class*="_markdown_"]` 容器内、排除 `pre` / `.md-code-block` / 工具输出块（`[data-read]`、`[data-diff]`、`[data-search]`、`[data-terminal]`）、并且点在链接/按钮上时不拦截；有文字选区时让位给原生选择。**动态粘贴版不支持**（沙箱不提供 `document`）
+- **行内代码点击复制**：原版挂在 `document` 上做事件委托；部署版同样是 `document` 捕获阶段委托，但多两层过滤——只在 `[class*="_markdown_"]` 容器内、排除 `pre` / `.md-code-block` / 工具输出块（`[data-read]`、`[data-diff]`、`[data-search]`、`[data-terminal]`）、并且点在链接/按钮上时不拦截；有文字选区时让位给原生选择。**动态粘贴版暂未实现**（动态沙箱里 `document` 其实是可达的，是没做，不是做不到）
 - **未移植**：消息宽度 75% 与表格宽度 70%（DSH 布局为固定列宽 + 表格自适应滚动，强行收窄会破坏版面）
 
 ## 自定义

@@ -28,10 +28,23 @@ if [ ! -d "$PROFILE_DIR" ]; then
   exit 1
 fi
 
+# ---------- 0) 先用 dsh plugin 装过就别再跑本脚本（会双挂同一个包） ----------
+if [ -f "$PROFILE_DIR/package.json" ] && grep -q '"dsh-refined"' "$PROFILE_DIR/package.json"; then
+  echo "错误: 该 profile 的 package.json 里已经有 dsh-refined 依赖。" >&2
+  echo "说明你已用 'dsh plugin add' 装过（README 方式一），再跑本脚本会重复挂载。" >&2
+  echo "如确实要改回脚本方式：先 'dsh plugin --profile $PROFILE remove dsh-refined'。" >&2
+  exit 1
+fi
+
 # ---------- 1) 链接包到 profile 的 node_modules ----------
 mkdir -p "$PROFILE_DIR/node_modules"
 LINK="$PROFILE_DIR/node_modules/dsh-refined"
-if [ -e "$LINK" ]; then
+if [ -L "$LINK" ] && [ ! -e "$LINK" ]; then
+  # 悬空符号链接（指向已删除的旧目录）：-e 为假，必须替换
+  rm -f "$LINK"
+  ln -s "$PKG_DIR" "$LINK"
+  echo "已替换悬空链接: $LINK -> $PKG_DIR"
+elif [ -e "$LINK" ]; then
   echo "已存在: $LINK（跳过链接）"
 else
   ln -s "$PKG_DIR" "$LINK"
@@ -45,12 +58,15 @@ SNIPPET='- insert:
       name: dsh-refined
       config: {}'
 
-if [ -f "$PATCH" ] && grep -q "id: dsh-refined" "$PATCH"; then
+if [ -f "$PATCH" ] && grep -qE '^[[:space:]]*-[[:space:]]*id:[[:space:]]*dsh-refined[[:space:]]*$' "$PATCH"; then
   echo "patch 已包含 dsh-refined 条目（跳过）: $PATCH"
 else
-  # 移除孤立的空列表行 []（patch 模板初始内容），避免 YAML 双值报错
   if [ -f "$PATCH" ]; then
-    sed -i '/^\[\]$/d' "$PATCH" 2>/dev/null || true
+    # 移除孤立的空列表行 []（DSH 新建 profile 的模板里就有一行），
+    # 用 grep+mv 而不是 sed -i：BSD sed 的 -i 必须带后缀，macOS 上会静默失败。
+    tmp="$(mktemp "${TMPDIR:-/tmp}/dsh-refined-patch.XXXXXX")"
+    grep -vE '^\[\][[:space:]]*$' "$PATCH" > "$tmp" || true
+    mv "$tmp" "$PATCH"
   else
     printf '# dsh profile patch layer\n' > "$PATCH"
   fi
@@ -62,7 +78,7 @@ echo ""
 echo "=============================================="
 echo "完成。请重启 DSH（当前运行中的进程会被替换）:"
 echo ""
-echo "  dsh --profile $PROFILE web --port 3080"
+echo "  dsh --profile $PROFILE --port 3080"     # 注意：不要再传位置参数 web，会被当成 app 参数报错
 echo ""
 echo "重启后验证:"
 echo "  1. Settings → 插件 出现 dsh-refined 条目"
